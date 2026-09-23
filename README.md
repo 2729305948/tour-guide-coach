@@ -1,6 +1,8 @@
 # vue-tour-guide
 
-轻量级交互式漫游引导引擎，基于 **Vue 3 + Pinia + Element Plus**。
+轻量级交互式漫游引导引擎，基于 **Vue 3 + Pinia**，**零 UI 组件库依赖**。
+
+样式沿用 Element Plus 设计语言（色彩、圆角、字号），但不需要安装任何组件库。如果项目已有 Element Plus，CSS 变量自动 fallback 到 `--el-*` 保持一致；独立使用时走内置默认值。
 
 与 driver.js / intro.js 等传统引导库的核心区别：**引导跟随用户真实操作推进**，而非"下一步"按钮翻页。用户必须点击高亮按钮、输入必填字段、选择下拉项后，引导才会进入下一步。
 
@@ -17,9 +19,11 @@
 
 ```bash
 npm install vue-tour-guide
+# 或从 GitHub
+npm install github:2729305948/vue-tour-guide
 ```
 
-Peer dependencies：`vue@^3.4`、`pinia@^2.1`、`element-plus@^2.5`。
+Peer dependencies：`vue@^3.4`、`pinia@^2.1`。**不需要任何 UI 组件库。**
 
 ## 快速开始
 
