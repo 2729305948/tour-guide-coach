@@ -3,28 +3,46 @@
   "version": "1.0.0",
   "description": "轻量级交互式漫游引导引擎（Vue 3，零外部依赖，Element Plus 风格）",
   "type": "module",
-  "main": "./src/index.ts",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    },
     "./configs/*": "./src/configs/*.ts"
   },
+  "files": ["dist", "src"],
   "peerDependencies": {
     "vue": "^3.4"
   },
   "devDependencies": {
+    "@element-plus/icons-vue": "^2.3.1",
     "@vitejs/plugin-vue": "^5.0",
+    "element-plus": "^2.7.5",
     "typescript": "^5.4",
     "vite": "^5.2",
-    "vue-tsc": "^2.0",
+    "vite-plugin-dts": "^5.1.1",
     "vue": "^3.4.27",
-    "element-plus": "^2.7.5",
-    "@element-plus/icons-vue": "^2.3.1"
+    "vue-tsc": "^2.0"
   },
   "scripts": {
     "dev": "cd demo && vite",
-    "build": "cd demo && vite build",
-    "typecheck": "vue-tsc --noEmit"
+    "build": "vite build --config vite.lib.config.ts",
+    "build:demo": "cd demo && vite build",
+    "typecheck": "vue-tsc --noEmit",
+    "prepublishOnly": "npm run build"
   },
-  "keywords": ["vue", "tour", "guide", "onboarding", "interactive-tutorial", "driver", "spotlight"],
+  "keywords": [
+    "vue",
+    "tour",
+    "guide",
+    "onboarding",
+    "interactive-tutorial",
+    "driver",
+    "spotlight"
+  ],
   "license": "MIT"
 }
