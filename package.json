@@ -1,6 +1,6 @@
 {
   "name": "tour-guide-coach",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "轻量级交互式漫游引导引擎（Vue 3，零外部依赖，Element Plus 风格）",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -14,7 +14,10 @@
     },
     "./configs/*": "./src/configs/*.ts"
   },
-  "files": ["dist", "src"],
+  "files": [
+    "dist",
+    "src"
+  ],
   "peerDependencies": {
     "vue": "^3.4"
   },
@@ -24,6 +27,7 @@
     "element-plus": "^2.7.5",
     "typescript": "^5.4",
     "vite": "^5.2",
+    "vite-plugin-css-injected-by-js": "^5.0.2",
     "vite-plugin-dts": "^5.1.1",
     "vue": "^3.4.27",
     "vue-tsc": "^2.0"
