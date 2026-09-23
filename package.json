@@ -1,0 +1,33 @@
+{
+  "name": "vue-tour-guide",
+  "version": "1.0.0",
+  "description": "轻量级交互式漫游引导引擎（Vue 3 + Pinia + Element Plus）",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./configs/*": "./src/configs/*.ts"
+  },
+  "peerDependencies": {
+    "vue": "^3.4",
+    "pinia": "^2.1",
+    "element-plus": "^2.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0",
+    "typescript": "^5.4",
+    "vite": "^5.2",
+    "vue-tsc": "^2.0",
+    "vue": "^3.4.27",
+    "pinia": "^2.1.7",
+    "element-plus": "^2.7.5",
+    "@element-plus/icons-vue": "^2.3.1"
+  },
+  "scripts": {
+    "dev": "cd demo && vite",
+    "build": "cd demo && vite build",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "keywords": ["vue", "tour", "guide", "onboarding", "element-plus", "interactive-tutorial"],
+  "license": "MIT"
+}
