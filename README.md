@@ -20,7 +20,7 @@
 ```bash
 npm install tour-guide-coach
 # 或从 GitHub
-npm install github:2729305948/vue-tour-guide
+npm install github:2729305948/tour-guide-coach
 ```
 
 Peer dependencies：`vue@^3.4`。**零外部依赖，不需要 UI 组件库，不需要 Pinia。**
