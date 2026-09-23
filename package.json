@@ -1,7 +1,7 @@
 {
   "name": "vue-tour-guide",
   "version": "1.0.0",
-  "description": "轻量级交互式漫游引导引擎（Vue 3 + Pinia，零 UI 库依赖，Element Plus 风格）",
+  "description": "轻量级交互式漫游引导引擎（Vue 3，零外部依赖，Element Plus 风格）",
   "type": "module",
   "main": "./src/index.ts",
   "exports": {
@@ -9,8 +9,7 @@
     "./configs/*": "./src/configs/*.ts"
   },
   "peerDependencies": {
-    "vue": "^3.4",
-    "pinia": "^2.1"
+    "vue": "^3.4"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0",
@@ -18,7 +17,6 @@
     "vite": "^5.2",
     "vue-tsc": "^2.0",
     "vue": "^3.4.27",
-    "pinia": "^2.1.7",
     "element-plus": "^2.7.5",
     "@element-plus/icons-vue": "^2.3.1"
   },

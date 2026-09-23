@@ -44,15 +44,14 @@
 import { ref } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { useTourStore, TourOverlay } from 'vue-tour-guide'
+import { TourOverlay, startTour } from 'vue-tour-guide'
 import { demoFormTour } from '../../src/configs/demo-form'
 
-const tour = useTourStore()
 const dialogVisible = ref(false)
 const form = ref({ name: '', category: '', date: '', remark: '' })
 
-function startTour(): void {
-  tour.startTour(demoFormTour, undefined, () => {
+function startDemoTour(): void {
+  startTour(demoFormTour, undefined, () => {
     ElMessage.success('引导完成！')
   })
 }
@@ -63,7 +62,7 @@ function onSubmit(): void {
 }
 
 // 页面加载后自动启动引导（演示用，实际项目里由用户触发）
-setTimeout(startTour, 800)
+setTimeout(startDemoTour, 800)
 </script>
 
 <style>

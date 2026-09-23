@@ -26,15 +26,15 @@
         <div v-if="step.tip" class="tp-tip">💡 {{ step.tip }}</div>
         <div v-if="step.warn" class="tp-warn">⚠️ {{ step.warn }}</div>
         <div class="tp-foot">
-          <button class="tg-btn tg-btn--link tg-btn--sm" @click="store.abort()">退出引导</button>
+          <button class="tg-btn tg-btn--link tg-btn--sm" @click="abort()">退出引导</button>
           <!-- trigger=click：只显示提示文字 -->
           <span v-if="step.trigger === 'click'" class="tp-click-hint">
             👆 请点击高亮区域
           </span>
           <!-- 其他步骤：跳过/下一步 -->
           <span v-else-if="store.gatePass" class="tp-btns">
-            <button v-if="canSkip" class="tg-btn tg-btn--sm" @click="store.skip()">跳过此步</button>
-            <button class="tg-btn tg-btn--primary tg-btn--sm" :style="{ background: accentColor, borderColor: accentColor }" @click="store.next()">
+            <button v-if="canSkip" class="tg-btn tg-btn--sm" @click="skip()">跳过此步</button>
+            <button class="tg-btn tg-btn--primary tg-btn--sm" :style="{ background: accentColor, borderColor: accentColor }" @click="next()">
               {{ isLast ? '完成' : '下一步' }}
             </button>
           </span>
@@ -49,8 +49,8 @@
         <svg v-if="!store.waitTimedOut" class="tg-spin" viewBox="0 0 1024 1024" width="28" height="28" fill="currentColor"><path d="M512 64a448 448 0 1 1 0 896 448 448 0 0 1 0-896zm0 64a384 384 0 1 0 0 768 384 384 0 0 0 0-768z" opacity=".25"/><path d="M512 64a448 448 0 0 1 448 448h-64A384 384 0 0 0 512 128V64z"/></svg>
         <svg v-else viewBox="0 0 1024 1024" width="28" height="28" fill="#e6a23c"><path d="M512 64L64 896h896L512 64zm0 192l288 576H224l288-576zm-32 224v128h64V480h-64zm0 160v64h64v-64h-64z"/></svg>
         <p>{{ store.waitTimedOut ? '未找到目标元素，可能是页面状态不符' : (step?.content ?? '等待页面加载...') }}</p>
-        <button v-if="store.waitTimedOut" class="tg-btn tg-btn--warning tg-btn--sm" @click="store.next()">跳过此步</button>
-        <button class="tg-btn tg-btn--sm" @click="store.abort()">退出引导</button>
+        <button v-if="store.waitTimedOut" class="tg-btn tg-btn--warning tg-btn--sm" @click="next()">跳过此步</button>
+        <button class="tg-btn tg-btn--sm" @click="abort()">退出引导</button>
       </div>
     </div>
   </Teleport>
@@ -58,14 +58,14 @@
 
 <script setup lang="ts">
 import { computed, watch, onBeforeUnmount } from 'vue'
-import { useTourStore } from './store'
+import { tourState, abort, next, skip } from './store'
 import type { CSSProperties } from 'vue'
 
-const store = useTourStore()
+const store = tourState
 
 /** ESC 退出引导 */
 function onKeydown(e: KeyboardEvent): void {
-  if (e.key === 'Escape' && store.active) store.abort()
+  if (e.key === 'Escape' && store.active) abort()
 }
 watch(() => store.active, (isActive) => {
   if (isActive) window.addEventListener('keydown', onKeydown)
