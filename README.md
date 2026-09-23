@@ -18,7 +18,7 @@
 ## 安装
 
 ```bash
-npm install @bigxv/vue-tour-guide
+npm install tour-guide-vue
 # 或从 GitHub
 npm install github:2729305948/vue-tour-guide
 ```

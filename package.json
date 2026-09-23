@@ -1,5 +1,5 @@
 {
-  "name": "@bigxv/vue-tour-guide",
+  "name": "tour-guide-vue",
   "version": "1.0.0",
   "description": "轻量级交互式漫游引导引擎（Vue 3，零外部依赖，Element Plus 风格）",
   "type": "module",
