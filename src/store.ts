@@ -46,6 +46,11 @@ function _currentStepFn(): TourStep | null {
   return tourState.config?.steps[tourState.stepIndex] ?? null
 }
 
+/** 获取当前步骤（供组件使用） */
+export function currentStep(): TourStep | null {
+  return _currentStepFn()
+}
+
 // ---------- 启动引导 ----------
 export function startTour(tour: TourConfig, resolver?: TargetResolver, done?: () => void): void {
   if (tourState.active) abort()

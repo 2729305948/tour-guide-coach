@@ -58,7 +58,7 @@
 
 <script setup lang="ts">
 import { computed, watch, onBeforeUnmount } from 'vue'
-import { tourState, abort, next, skip } from './store'
+import { tourState, abort, next, skip, currentStep } from './store'
 import type { CSSProperties } from 'vue'
 
 const store = tourState
@@ -73,7 +73,7 @@ watch(() => store.active, (isActive) => {
 })
 onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
-const step = computed(() => store.currentStep())
+const step = computed(() => currentStep())
 const rect = computed(() => store.highlightRect)
 const accentColor = computed(() => step.value?.accent ?? store.config?.accent ?? '#409eff')
 const isLast = computed(() => store.stepIndex >= store.totalSteps - 1)
