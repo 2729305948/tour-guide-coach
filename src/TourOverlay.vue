@@ -20,7 +20,7 @@
           <span class="tp-step-no" :style="{ background: accentColor }">{{ store.stepIndex + 1 }}</span>
           <span v-if="step.gate" class="tp-required">*</span>
           <span class="tp-title">{{ step.title }}</span>
-          <span class="tp-of">/ {{ store.totalSteps }}</span>
+          <span class="tp-of">第 {{ store.stepIndex + 1 }} / {{ store.totalSteps }} 步</span>
         </div>
         <p class="tp-content">{{ step.content }}</p>
         <div v-if="step.tip" class="tp-tip">💡 {{ step.tip }}</div>
@@ -190,30 +190,39 @@ function onBlockedClick(): void { /* 静默拦截 */ }
 /* ---------- 气泡 ---------- */
 .tour-popover {
   z-index: 100002; background: #fff; border-radius: 12px;
-  padding: 16px 18px; box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  padding: 20px 24px; box-shadow: 0 8px 40px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
   animation: tp-in 0.3s ease; pointer-events: auto;
+  min-width: 280px; max-width: 420px;
 }
 @keyframes tp-in {
   from { opacity: 0; transform: translateY(6px) scale(0.97); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
-.tp-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.tp-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .tp-step-no {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 22px; height: 22px; border-radius: 50%;
-  color: #fff; font-size: 12px; font-weight: 700; flex-shrink: 0;
+  width: 28px; height: 28px; border-radius: 50%;
+  color: #fff; font-size: 14px; font-weight: 700; flex-shrink: 0;
 }
-.tp-required { color: var(--tg-danger); font-size: 18px; font-weight: 700; line-height: 1; margin-right: -4px; }
-.tp-title { font-size: 15px; font-weight: 600; color: var(--tg-text-1); }
-.tp-of { font-size: 12px; color: var(--tg-text-3); margin-left: auto; }
-.tp-content { margin: 0 0 10px; font-size: 13px; line-height: 1.7; color: var(--tg-text-2); white-space: pre-line; }
-.tp-tip { font-size: 12px; color: #529b2e; background: #f0f9eb; padding: 6px 10px; border-radius: 6px; margin-bottom: 8px; }
-.tp-warn { font-size: 12px; color: #b88230; background: #fdf6ec; padding: 6px 10px; border-radius: 6px; margin-bottom: 8px; }
-.tp-foot { display: flex; align-items: center; justify-content: space-between; padding-top: 10px; border-top: 1px solid #f0f0f0; }
-.tp-btns { display: flex; gap: 8px; }
-.tp-gate { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--tg-warning); }
+.tp-required { color: var(--tg-danger); font-size: 20px; font-weight: 700; line-height: 1; }
+.tp-title { font-size: 16px; font-weight: 700; color: var(--tg-text-1); }
+.tp-of { font-size: 13px; color: var(--tg-text-3); margin-left: auto; font-variant-numeric: tabular-nums; }
+.tp-content { margin: 0 0 14px; font-size: 14px; line-height: 1.8; color: var(--tg-text-2); white-space: pre-line; }
+.tp-tip {
+  font-size: 13px; color: #529b2e; background: #f0f9eb;
+  padding: 8px 12px; border-radius: 6px; margin-bottom: 10px;
+  border-left: 3px solid #67c23a;
+}
+.tp-warn {
+  font-size: 13px; color: #b88230; background: #fdf6ec;
+  padding: 8px 12px; border-radius: 6px; margin-bottom: 10px;
+  border-left: 3px solid #e6a23c;
+}
+.tp-foot { display: flex; align-items: center; justify-content: space-between; padding-top: 14px; border-top: 1px solid var(--tg-border); }
+.tp-btns { display: flex; gap: 10px; }
+.tp-gate { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--tg-warning); font-weight: 500; }
 .tp-gate-icon { flex-shrink: 0; }
-.tp-click-hint { font-size: 13px; color: var(--tg-primary); font-weight: 500; animation: pulse-hint 1.5s ease-in-out infinite; }
+.tp-click-hint { font-size: 14px; color: var(--tg-primary); font-weight: 500; animation: pulse-hint 1.5s ease-in-out infinite; }
 @keyframes pulse-hint { 0%,100%{opacity:1} 50%{opacity:.5} }
 
 /* ---------- 等待态 ---------- */
