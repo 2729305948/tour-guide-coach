@@ -18,7 +18,7 @@
 ## 安装
 
 ```bash
-npm install tour-guide-vue
+npm install tour-guide-coach
 # 或从 GitHub
 npm install github:2729305948/vue-tour-guide
 ```
