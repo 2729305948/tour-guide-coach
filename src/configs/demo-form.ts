@@ -44,11 +44,9 @@ export const demoFormTour: TourConfig = {
       content: '从下拉中选择分类（必填）。\n注意下拉面板也被高亮区域包含。',
       trigger: 'change',
       gate: (resolve) => {
+        // 读宿主镜像的 data-tour-value，不依赖 Element Plus 内部类名（2.8 重写过 select）
         const el = resolve('.el-dialog__body .el-form-item:nth-child(2) .el-select')
-        if (!el) return false
-        const ph = el.querySelector('.el-select__placeholder')
-        if (!ph) return true
-        return !ph.classList.contains('is-transparent')
+        return !!el?.dataset.tourValue
       },
       gateHint: '请选择一个分类'
     },

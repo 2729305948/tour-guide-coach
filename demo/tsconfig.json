@@ -12,6 +12,7 @@
     "skipLibCheck": true,
     "noEmit": true,
     "paths": {
+      "tour-guide-coach": ["../src/index.ts"],
       "vue-tour-guide": ["../src/index.ts"],
       "@/*": ["../src/*"]
     }

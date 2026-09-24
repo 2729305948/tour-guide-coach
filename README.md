@@ -1,4 +1,4 @@
-# vue-tour-guide
+# tour-guide-coach
 
 轻量级交互式漫游引导引擎，基于 **Vue 3**，**零外部依赖**。
 
@@ -33,7 +33,7 @@ Peer dependencies：`vue@^3.4`。**零外部依赖，不需要 UI 组件库，�
 
 ```vue
 <script setup>
-import { TourOverlay } from 'vue-tour-guide'
+import { TourOverlay } from 'tour-guide-coach'
 </script>
 
 <template>
@@ -48,12 +48,13 @@ import { TourOverlay } from 'vue-tour-guide'
 
 ```ts
 // tours/create-project.ts
-import type { TourConfig } from 'vue-tour-guide'
+import type { TourConfig } from 'tour-guide-coach'
 
 export const tourCreateProject: TourConfig = {
   key: 'create-project',
   name: '新建项目引导',
   accent: '#409eff',
+  autoScroll: true,                   // 目标不在视口内时自动滚过去（默认 true）
   steps: [
     {
       id: 'open-btn',
@@ -94,11 +95,10 @@ export const tourCreateProject: TourConfig = {
 ### 3. 触发引导
 
 ```ts
-import { useTourStore } from 'vue-tour-guide'
+import { startTour } from 'tour-guide-coach'
 import { tourCreateProject } from './tours/create-project'
 
-const tour = useTourStore()
-tour.startTour(tourCreateProject, undefined, () => {
+startTour(tourCreateProject, undefined, () => {
   console.log('引导完成')
 })
 ```
@@ -106,12 +106,26 @@ tour.startTour(tourCreateProject, undefined, () => {
 ### 4. 运行 Demo
 
 ```bash
-cd demo
-npm install
-npm run dev
+npm install     # 根目录装依赖，demo 复用同一份 node_modules
+npm run dev     # 起 demo（Vite，默认 http://localhost:5173）
 ```
 
-浏览器打开后自动启动引导，展示完整流程：点击按钮 → 弹窗 → 填名称 → 选分类（动态高亮下拉）→ 选日期（动态高亮日历）→ 提交。
+demo 直接 alias 到 `src/`，改引擎代码即时生效，不需要先 build。页面按 10 个场景组织，每条卡片都写了「观察点」，右侧「引导日志」把 `tourState` 的每次状态跃迁摊开显示，控制台里还能用 `__tour` 直接读引擎单例。
+
+| 分组 | 场景 | 验证什么 |
+|---|---|---|
+| 表单流程 | 新建表单引导 | `click` + `afterClickWait`、input/change 门控、`expandSelector` 并入下拉与日历面板 |
+| 表单流程 | 综合长流程（9 步） | 异步 `beforeEnter` → 页面 → 弹窗 A → 弹窗 B → 提交的连续链路 |
+| 关窗判定 | 意外关窗 → 中断 → 重试续上 | 本步未完成就关窗：收起遮罩 + 中断面板 + `onTargetLost`，重开后「重试此步」自动续上 |
+| 关窗判定 | 门控已过 + 关窗 → 自动推进 | 选完值直接点保存：判为正常流转，静默推进，不弹中断 |
+| 关窗判定 | 点 A 开 B（跨弹窗迁移） | 点击导致当前弹窗关闭、另一个打开：高亮迁移，不误判 |
+| 边界兜底 | 目标延迟出现 | 等待态 → 元素冒头瞬间自动挂载 |
+| 边界兜底 | 目标永不存在 | 12s 超时只给「跳过此步 / 退出引导」，不自动跳步 |
+| 边界兜底 | 贴边翻转 / 钳制 / 超长内容 | 四个视口贴边目标触发方位翻转；长内容气泡内滚动 |
+| 鲁棒性 | 滚动跟随 + 弹窗重建 DOM | 滚动容器内高亮实时跟随；`destroy-on-close` 重建后仍挂到新节点 |
+| 鲁棒性 | 多 popper 共存 | 两个下拉面板同时存在时取第一个可见的 |
+
+> 提示：把浏览器窗口缩到 1024×700 以下再看「贴边翻转」更明显；按 ESC 可随时退出引导。
 
 ## 引导规则
 
@@ -129,6 +143,7 @@ interface TourStep {
   gate?: (resolve) => boolean         // 门控条件
   gateHint?: string                   // 门控未通过时的提示
   waitForElement?: string             // trigger=wait-dom 时等待的元素
+  maskWhileWaiting?: boolean          // 等待目标期是否压全屏遮罩（默认 true）
   autoDelay?: number                  // trigger=auto 时延时
   clickDelay?: number                 // trigger=click 时点击后延时
   afterClickWait?: string             // 点击后等待的元素（如弹窗出现）
@@ -159,6 +174,19 @@ gate: (resolve) => {
   const input = resolve('.my-form input[name="title"]')
   return !!(input as HTMLInputElement)?.value?.trim()
 }
+```
+
+### 等待期遮罩策略
+
+目标还没就绪（进入步骤的首帧、`wait-dom` 等待中、12s 超时）时，默认**压整屏遮罩且不挖洞**——避免用户在等待期点别处把页面状态搞乱，导致目标永远等不到。
+
+两个例外：
+
+```ts
+// ① 需要用户点页面元素才能唤醒目标 → 放行
+{ id: 'lazy', target: '#later-rendered', maskWhileWaiting: false, ... }
+
+// ② 目标意外消失（依附窗口被关）→ 始终放行，用户要能重开窗口
 ```
 
 ## 动态高亮（expandSelector）
@@ -196,7 +224,7 @@ gate: (resolve) => {
 
 **根因**：根容器 `.tour-root` 是 `position: fixed; inset: 0` 的全屏 div，默认 `pointer-events: auto` 会拦截所有点击（包括高亮区域）。
 
-**修复**：根容器 `pointer-events: none`，只让 `.tour-mask` 4 块遮罩、`.tour-popover` 气泡、`.tour-waiting` 等待框单独 `pointer-events: auto`。
+**修复**：根容器 `pointer-events: none`，只让 `.tour-mask-path`（SVG 遮罩的填充路径）、`.tour-popover` 气泡、`.tour-waiting` 等待框单独 `pointer-events: auto`。
 
 ### 2. `el-dialog` 选择器别用 `:has()` 复杂前缀
 
@@ -250,7 +278,7 @@ gate: (resolve) => {
 
 **症状**：`router.push('/t/home')` 后立即 `startTour()` → 页面还在异步加载数据，按钮未渲染 → 卡等待。
 
-**修复**：`setTimeout(() => tour.startTour(config), 1200)` 给页面渲染 + 数据加载留时间；引擎的 MutationObserver 兜底等元素出现。
+**修复**：`setTimeout(() => startTour(config), 1200)` 给页面渲染 + 数据加载留时间；引擎的 MutationObserver 兜底等元素出现。
 
 ### 10. Element Plus tab id 命名规则
 
@@ -258,30 +286,83 @@ gate: (resolve) => {
 
 **修复**：用 `#tab-{name}` 精确定位（Element Plus 自动生成的 id）。
 
+### 11. 依附的弹窗被用户自己关掉 → 引导卡死
+
+**症状**：高亮目标在 `el-dialog` 内，用户点了弹窗的 × / 遮罩 / ESC 关掉窗口，气泡和遮罩的洞仍冻结在原位，gate 永远不可能通过，引导死在那一步。
+
+**修复**：引擎在目标挂载后开启存活检测（200ms 轮询 `isConnected` + `getClientRects()`，连续 2 次失败才确认，避开关闭动画中间帧），并严格区分**正常流转**与**意外关闭**：
+
+| 消失时机 | 判定 | 行为 |
+|---|---|---|
+| `trigger: 'click'` 已触发（点完就换弹窗） | 正常流转 | 立即解除存活检测，按 `clickDelay` / `afterClickWait` 推进 |
+| 本步 `gate` 已通过（选完值直接点保存关掉弹窗） | 正常流转 | 自动 `next()`，不弹中断 |
+| 本步 `gate` 未通过时目标消失 | 意外关闭 | 收起遮罩洞（页面可操作）+ 底部中断提示 + 回调 `onTargetLost` |
+
+中断提示带「重试此步」：重新进入等待态，用户重开窗口后 MutationObserver 自动续上（无需重启引导）。「退出引导」走 `abort()`。
+
+**注意**：目标"在 DOM 里但 `display:none`"（v-show 关着的弹窗）同样算消失，原因标记 `hidden`；引擎不会把它当就绪元素挂出 0×0 的错位高亮。
+
+### 12. 被滚动容器裁切的目标，视口矩形会"骗人"
+
+**症状**：目标在 `overflow:auto` 的容器里被裁掉、肉眼看不见，但按"是否超出视口"判断却得出"在视口内"，于是自动滚动不触发。
+
+**根因**：`getBoundingClientRect()` 返回的是布局位置，被祖先裁掉的元素数值上依然落在视口范围内。
+
+**修复**：`_needsScroll()` 除了比对视口边距，还沿 `parentElement` 链找出非 `visible` 的 overflow 祖先，逐个比对元素矩形是否越出该祖先的矩形。
+
 ## API
 
-### `useTourStore()`
+### 导出函数
+
+模块级单例，无需 `useStore()`：
 
 ```ts
-const tour = useTourStore()
-tour.startTour(config, resolver?, onComplete?)
-tour.abort()
-tour.next()
-tour.skip()
-tour.complete()
+import { startTour, abort, next, skip, complete, retryLost, currentStep, tourState, TourOverlay } from 'tour-guide-coach'
+
+startTour(config, resolver?, onComplete?)
+abort()        // 退出并清理
+next() / skip()
+complete()     // 手动收尾（触发 onComplete）
+retryLost()    // 中断后重试：重新等待本步目标出现
 ```
 
-### 响应式状态
+### 行为开关
+
+| 位置 | 字段 | 默认 | 作用 |
+|---|---|---|---|
+| `TourConfig` | `autoScroll` | `true` | 目标在视口外或被滚动容器裁切时，就绪那一刻自动滚到视野中央 |
+| `TourConfig` | `onTargetLost` | 无 | 依附窗口被意外关闭时回调宿主（stepId / stepIndex / target / reason） |
+| `TourStep` | `maskWhileWaiting` | `true` | 等待目标期间是否压全屏遮罩；需要用户点页面元素唤醒目标时置 `false` |
+
+### 响应式状态（`tourState`，shallowReactive）
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `active` | `Ref<boolean>` | 是否有引导正在播放 |
-| `stepIndex` | `Ref<number>` | 当前步索引 |
-| `totalSteps` | `Ref<number>` | 总步数 |
-| `highlightRect` | `ShallowRef<HighlightRect>` | 当前高亮矩形 |
-| `gatePass` | `Ref<boolean>` | 当前步 gate 是否通过 |
-| `waitingTarget` | `Ref<boolean>` | 是否等待目标元素 |
-| `waitTimedOut` | `Ref<boolean>` | 等待是否超时 |
+| `active` | `boolean` | 是否有引导正在播放 |
+| `stepIndex` | `number` | 当前步索引 |
+| `totalSteps` | `number` | 总步数 |
+| `highlightRect` | `HighlightRect \| null` | 当前高亮矩形 |
+| `gatePass` | `boolean` | 当前步 gate 是否通过 |
+| `waitingTarget` | `boolean` | 是否等待目标元素 |
+| `waitTimedOut` | `boolean` | 等待是否超时 |
+| `targetLost` | `boolean` | 依附窗口被意外关闭，引导已中断 |
+| `lostReason` | `'' \| 'removed' \| 'hidden'` | 目标消失形态 |
+
+### `onTargetLost` 回调（可选）
+
+宿主可借此打点、弹自己的提示，或自动帮用户重开窗口：
+
+```ts
+const tourCreateTask: TourConfig = {
+  key: 'create-task',
+  name: '新建任务引导',
+  accent: '#409eff',
+  steps: [/* ... */],
+  onTargetLost: ({ stepId, stepIndex, title, target, reason }) => {
+    ElMessage.warning(`引导在第 ${stepIndex + 1} 步「${title}」中断（${reason}）`)
+  }
+}
+```
 
 ### `resolver` 参数（可选）
 
@@ -293,7 +374,7 @@ const resolver: TargetResolver = (target) => {
   const el = (dialogRef.value as any)[refName]?.$el
   return childSel ? el?.querySelector(childSel) : el
 }
-tour.startTour(config, resolver)
+startTour(config, resolver)
 ```
 
 ## 许可

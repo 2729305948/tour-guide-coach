@@ -9,7 +9,10 @@
  *   // 业务页调用 startTour(config)
  *   // CSS 已内联到 JS，无需手动引入样式文件
  */
-export { tourState, startTour, abort, next, skip, complete, currentStep } from './store'
+export { tourState, startTour, abort, next, skip, complete, currentStep, retryLost } from './store'
 export type { TargetResolver } from './store'
 export { default as TourOverlay } from './TourOverlay.vue'
-export type { TourConfig, TourStep, StepTrigger, PopPlacement, HighlightRect } from './types'
+export type {
+  TourConfig, TourStep, StepTrigger, PopPlacement, HighlightRect,
+  TargetLostReason, TargetLostContext, TourActionContext
+} from './types'
