@@ -103,7 +103,7 @@ export interface TourStep {
   /** auto 模式下点「下一步」时代引擎代为执行的操作（点击/填充/选择等）。
    *  返回 Promise 则等其完成后再推步；不写则本步「下一步」只推进不操作。 */
   action?: (ctx: TourActionContext) => void | Promise<void>
-  /** auto 模式下 action 执行完到高亮进入下一步之间的停留（ms），默认 600，便于看清结果 */
+  /** auto 模式下 action 执行完到高亮进入下一步之间的停留（ms），默认取 TourConfig.actionDwell（350），便于看清结果 */
   actionDwell?: number
 }
 
@@ -138,6 +138,9 @@ export interface TourConfig {
    *  - 'auto'：托管/演示模式——用户只能点「下一步」，页面被全屏遮罩禁点，
    *    每点一次「下一步」引擎按步骤 action 代用户操作（点击/填充/选择…）再推进。 */
   mode?: 'interactive' | 'auto'
+  /** auto 模式下 action 执行完到推步之间的全局停留（ms），默认 350，用于让人看清引擎刚替你做了什么。
+   *  单步的 actionDwell 优先于它。只影响节奏，不承担"等 DOM 渲染"——渲染到位由引擎自己盯。 */
+  actionDwell?: number
   /** 全局强调色 */
   accent: string
   /** 目标不在视口内时自动滚动到高亮位置（默认 true）。

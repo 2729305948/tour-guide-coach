@@ -20,8 +20,10 @@ const ELEMENT_WAIT_TIMEOUT = 12000
 const LOST_CHECK_INTERVAL = 200
 /** 连续判定失败次数阈值：避开弹窗关闭动画的中间帧，约 400ms 才确认消失 */
 const LOST_CONFIRM_TICKS = 2
-/** auto 模式：action 执行完到推步之间的默认停留（ms），让用户看清"引擎在替我操作" */
-const AUTO_ACTION_DWELL = 600
+/** auto 模式：action 执行完到推步之间的默认停留（ms），让用户看清"引擎在替我操作"。
+ *  只承担"看清"的节奏，不再承担"等 DOM 渲染完"——后者已由 MO 逐帧等待（见 _waitForNodes）与
+ *  入场过渡跟随（见 _followEnterTransition）负责，所以从 600 压到 350。 */
+const AUTO_ACTION_DWELL = 350
 
 // ---------- 响应式状态（模块级单例） ----------
 export const tourState = shallowReactive({
@@ -184,7 +186,7 @@ function _advance(): void {
 /** auto 模式：执行本步 action（可 async）→ 停留 → 推进；期间置 autoBusy 防连点 */
 function _runAutoAction(step: TourStep): void {
   tourState.autoBusy = true
-  const dwell = step.actionDwell ?? AUTO_ACTION_DWELL
+  const dwell = step.actionDwell ?? tourState.config?.actionDwell ?? AUTO_ACTION_DWELL
   const settle = (): void => {
     window.setTimeout(() => { tourState.autoBusy = false; _advance() }, dwell)
   }
@@ -806,6 +808,27 @@ function _startWaitForElement(target: string, cb: () => void, requireVisible = f
   _waitTimer = setTimeout(settle, ELEMENT_WAIT_TIMEOUT)
 }
 
+/**
+ * 等 DOM 中出现满足条件的节点：MutationObserver 驱动（微任务级响应，比 setTimeout 轮询快一个
+ * 量级，也不受后台标签页定时器节流影响），超时只做兜底。命中即走，绝不空等固定时长。
+ * 用于「点了之后要等它渲染出来的东西」——下拉面板、异步选项、路由后的节点等。
+ */
+function _waitForNodes(pick: () => HTMLElement[], timeoutMs: number): Promise<HTMLElement[]> {
+  return new Promise((resolve) => {
+    let obs: MutationObserver | null = null
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const finish = (): void => {
+      obs?.disconnect(); obs = null
+      if (timer) { clearTimeout(timer); timer = null }
+      resolve(pick())
+    }
+    if (pick().length) { resolve(pick()); return } // 已在场：零等待
+    obs = new MutationObserver(() => { if (pick().length) finish() })
+    obs.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class'] })
+    timer = setTimeout(finish, timeoutMs)
+  })
+}
+
 function _autoAdvance(step: TourStep): void {
   _clickDelayTimer = setTimeout(() => next(), step.autoDelay ?? 600)
 }
@@ -848,14 +871,29 @@ function _actCheck(el: HTMLElement, checked = true): void {
   _actClick(input)
 }
 
-/** 尽力而为的下拉选择：点开 → 等面板 → 按 ARIA role=option 文本/序号点 */
+/** 等下拉面板渲染出可见选项的上限（ms）：正常几十毫秒即命中，只有慢机器/异步选项才用到 */
+const SELECT_PANEL_TIMEOUT_MS = 1000
+/** 选项出现后到点击之间的最短展示时长（ms），从「出现」那一刻起算（不是从点击触发器起算）。
+ *  托管演示是演给人看的：面板刚冒头就点掉，用户只看到一闪，等于没展示——所以这里保留一段
+ *  "看清引擎点了哪一项"的时间。它和旧的固定盲等有本质区别：慢机器该等的部分照等，
+ *  快机器不再多等渲染之外的时间。 */
+const SELECT_SHOW_MIN_MS = 350
+
+/** 当前可点的下拉选项：过滤掉 display:none 的残留面板，以及正在播收起动画（offsetHeight 还没归零）的面板 */
+function _visibleOptions(): HTMLElement[] {
+  return ([...document.querySelectorAll('[role="option"]')] as HTMLElement[])
+    .filter((o) => o.offsetHeight > 0 && !_isLeaving(o))
+}
+
+/** 尽力而为的下拉选择：点开 → 等面板出现可见选项（不盲等固定时长）→ 留够展示时间 → 按文本/序号点 */
 async function _actSelect(el: HTMLElement, label: string | number): Promise<void> {
   // 触发点在内部（EP 的下拉监听在 wrapper，对根节点派发不会向下冒泡）；点 input 会冒泡到 wrapper 打开
   const trigger = (el.querySelector('[aria-haspopup],[role="combobox"],input') || el) as HTMLElement
   _actClick(trigger)
-  await new Promise((r) => window.setTimeout(r, 350))
-  const opts = [...document.querySelectorAll('[role="option"]')] as HTMLElement[]
-  const visible = opts.filter((o) => o.offsetHeight > 0)
+  const t0 = performance.now()
+  const visible = await _waitForNodes(_visibleOptions, SELECT_PANEL_TIMEOUT_MS)
+  const showLeft = SELECT_SHOW_MIN_MS - (performance.now() - t0)
+  if (showLeft > 0) await new Promise((r) => window.setTimeout(r, showLeft))
   const hit = typeof label === 'number'
     ? visible[label]
     : visible.find((o) => (o.textContent || '').trim().includes(String(label)))
