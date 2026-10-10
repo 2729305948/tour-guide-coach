@@ -141,6 +141,10 @@ export interface TourConfig {
   /** auto 模式下 action 执行完到推步之间的全局停留（ms），默认 350，用于让人看清引擎刚替你做了什么。
    *  单步的 actionDwell 优先于它。只影响节奏，不承担"等 DOM 渲染"——渲染到位由引擎自己盯。 */
   actionDwell?: number
+  /** auto 模式下 ctx.select 展开下拉后，选项的最短可见时长（ms），默认 350；置 0 则一发现选项就点。
+   *  托管演示是演给人看的——面板刚冒头就被点掉等于没展示。同样只影响"看"的节奏：
+   *  面板是否渲染到位由引擎盯（上限 1s 兜底），这里只保证露脸时间。 */
+  selectShowMs?: number
   /** 全局强调色 */
   accent: string
   /** 目标不在视口内时自动滚动到高亮位置（默认 true）。

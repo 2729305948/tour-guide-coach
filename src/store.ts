@@ -873,7 +873,8 @@ function _actCheck(el: HTMLElement, checked = true): void {
 
 /** 等下拉面板渲染出可见选项的上限（ms）：正常几十毫秒即命中，只有慢机器/异步选项才用到 */
 const SELECT_PANEL_TIMEOUT_MS = 1000
-/** 选项出现后到点击之间的最短展示时长（ms），从「出现」那一刻起算（不是从点击触发器起算）。
+/** 选项出现后到点击之间的默认最短展示时长（ms），可被 TourConfig.selectShowMs 覆盖；
+ *  从「出现」那一刻起算（不是从点击触发器起算）。
  *  托管演示是演给人看的：面板刚冒头就点掉，用户只看到一闪，等于没展示——所以这里保留一段
  *  "看清引擎点了哪一项"的时间。它和旧的固定盲等有本质区别：慢机器该等的部分照等，
  *  快机器不再多等渲染之外的时间。 */
@@ -892,7 +893,7 @@ async function _actSelect(el: HTMLElement, label: string | number): Promise<void
   _actClick(trigger)
   const t0 = performance.now()
   const visible = await _waitForNodes(_visibleOptions, SELECT_PANEL_TIMEOUT_MS)
-  const showLeft = SELECT_SHOW_MIN_MS - (performance.now() - t0)
+  const showLeft = (tourState.config?.selectShowMs ?? SELECT_SHOW_MIN_MS) - (performance.now() - t0)
   if (showLeft > 0) await new Promise((r) => window.setTimeout(r, showLeft))
   const hit = typeof label === 'number'
     ? visible[label]
