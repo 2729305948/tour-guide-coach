@@ -30,6 +30,12 @@ export const tourState = shallowReactive({
   stepIndex: 0,
   totalSteps: 0,
   highlightRect: null as HighlightRect | null,
+  /** 最近一次 highlightRect 变化是否应做过渡动画：true=扩展/换步（平滑追随），false=滚动/缩放（即时吸附） */
+  highlightAnimated: false,
+  /** 临时覆盖本次过渡时长（ms）；用于完成动画单独取 completeTransition。null=用 rectTransition */
+  highlightAnimMs: null as number | null,
+  /** 完成动画进行中：把可视区扩到整屏的这段时间，隐藏气泡避免随整屏 rect 乱跳 */
+  completing: false,
   targetEl: null as HTMLElement | null,
   gatePass: true,
   waitingTarget: false,
@@ -95,6 +101,9 @@ export function abort(): void {
   tourState.config = null
   tourState.highlightRect = null
   tourState.targetEl = null
+  tourState.highlightAnimated = false
+  tourState.highlightAnimMs = null
+  tourState.completing = false
   tourState.targetLost = false
   tourState.lostReason = ''
   tourState.autoBusy = false
@@ -109,16 +118,40 @@ export function abort(): void {
 export function complete(): void {
   _enterGen += 1 // 同 abort：清掉在途回调的生效资格（gate 保留最后值，避免收尾瞬间闪回锁定态）
   _cleanup()
-  tourState.active = false
-  tourState.highlightRect = null
-  tourState.targetEl = null
-  tourState.targetLost = false
-  tourState.lostReason = ''
-  tourState.autoBusy = false
+  const dur = tourState.config?.completeTransition ?? 300
   const cb = onComplete
-  _resolver = null
-  onComplete = null
-  cb?.()
+  const teardown = (): void => {
+    tourState.active = false
+    tourState.highlightRect = null
+    tourState.targetEl = null
+    tourState.highlightAnimated = false
+    tourState.highlightAnimMs = null
+    tourState.completing = false
+    tourState.targetLost = false
+    tourState.lostReason = ''
+    tourState.autoBusy = false
+    _resolver = null
+    onComplete = null
+    cb?.()
+  }
+  // 完成动画：把可视区扩到铺满整屏（洞撑满 → 暗罩淡出），过渡完再收尾触发 onComplete。
+  // 目标 rect 取「以当前高亮中心为圆心、恰好盖住整屏」的矩形——插值全程中心不动，
+  // 是纯粹的原地放大；若直接取 (0,0,整屏)，框的左上角会一路扫向屏幕角，看着像飞走。
+  if (dur > 0 && tourState.highlightRect) {
+    const cur = tourState.highlightRect
+    const cx = cur.left + cur.width / 2
+    const cy = cur.top + cur.height / 2
+    const halfW = Math.max(cx, window.innerWidth - cx) + 8
+    const halfH = Math.max(cy, window.innerHeight - cy) + 8
+    tourState.completing = true
+    tourState.highlightAnimMs = dur
+    tourState.highlightAnimated = true
+    tourState.targetEl = null
+    tourState.highlightRect = { top: cy - halfH, left: cx - halfW, width: halfW * 2, height: halfH * 2 }
+    window.setTimeout(teardown, dur)
+    return
+  }
+  teardown()
 }
 
 // ---------- 步骤推进 ----------
@@ -173,6 +206,9 @@ function _enterStep(): void {
   tourState.lostReason = ''
   tourState.highlightRect = null
   tourState.targetEl = null
+  tourState.highlightAnimated = false
+  tourState.highlightAnimMs = null
+  tourState.completing = false
   _hlEl = null
   _boundPanel = null
   _panelArmedUntil = 0
@@ -251,7 +287,7 @@ function _onTargetReady(el: HTMLElement | null, step: TourStep): void {
   _hlEl = _resolveHighlightEl(el) // promoteControl：把 input 叶子提升到画了可见盒子的控件根
   _startTrackingRect(el)          // 先绑滚动/尺寸监听
   _scrollIntoViewIfNeeded(el)     // 再滚动，滚动事件会持续把 rect 刷新到位
-  _updateRect(el)
+  _updateRect(el, true)           // 进入本步首帧：animate=true，让上一步保持的旧框平滑滑移到新目标
   // auto 模式：用户不操作、页面变化只由引擎 action 引发（属预期），不绑 trigger/gate，也不做意外关窗检测
   if (tourState.config?.mode !== 'auto') {
     _bindTrigger(el, step)
@@ -318,16 +354,27 @@ function _boxOf(el: HTMLElement): HighlightRect {
 }
 
 /**
- * 面板专用：取原始（变换后）rect。teleport 面板的开合多是顶部原点 scaleY——
- * 用 _boxOf 反推中心会让高亮整体偏上、动画结束再跳回（抖动）。原始 rect 的 top 固定、
- * 高度随动画长起，与面板自身的揭示动画同步，无跳动。目标元素仍走 _boxOf（治 el-tag 压扁）。
+ * 面板专用测量：尺寸取布局 offsetWidth/Height（不受自身 transform 缩放影响），位置取视觉 rect。
+ * 面板展开是 scaleY(0→1) 过渡，视觉 rect 首帧高为 0；量布局尺寸则首帧即拿到最终大小，
+ * 高亮由组件侧 glide 平滑长大。收起时面板带 *-leave-* 过渡类，由 _isLeaving 视为已消失、
+ * 高亮同步缩回——不再撑到 display:none 才缩（收起停顿）。
  */
 function _rawBox(el: HTMLElement): HighlightRect {
   const r = el.getBoundingClientRect()
-  return { top: r.top, left: r.left, width: r.width, height: r.height }
+  return { top: r.top, left: r.left, width: el.offsetWidth || r.width, height: el.offsetHeight || r.height }
 }
 
-function _updateRect(el: HTMLElement): void {
+/**
+ * 元素（或其浮层包裹层）是否处于 Vue 过渡的 leave 阶段。Vue/EP 的过渡类名约定为 `*-leave-*`
+ * （如 el-zoom-in-top-leave-active），且 EP 的过渡类加在 .el-popper 包裹层而非下拉面板本身，
+ * 所以沿祖先向上查。面板收起动画期间它仍在 DOM、offsetHeight 不变，若照常并入，高亮会一直
+ * 撑到 display:none 才缩——表现为"收起停顿一下才缩"。视为已消失即可让高亮同步缩回。
+ */
+function _isLeaving(el: HTMLElement): boolean {
+  return !!el.closest('[class*="-leave-"]')
+}
+
+function _computeRect(el: HTMLElement): HighlightRect {
   const hl = _hlEl ?? el
   const b = _boxOf(hl)
   const pad = 6
@@ -340,7 +387,8 @@ function _updateRect(el: HTMLElement): void {
     const candidates = document.querySelectorAll(expandSel)
     let expandEl: HTMLElement | null = null
     for (const c of candidates) {
-      if ((c as HTMLElement).offsetHeight > 0) { expandEl = c as HTMLElement; break }
+      // 带 leave 过渡类的面板正在收起，视为已消失，高亮同步缩回（避免收起停顿）
+      if ((c as HTMLElement).offsetHeight > 0 && !_isLeaving(c as HTMLElement)) { expandEl = c as HTMLElement; break }
     }
     if (expandEl) {
       const eb = _rawBox(expandEl)
@@ -353,7 +401,19 @@ function _updateRect(el: HTMLElement): void {
   } else if (_currentStep?.autoExpand) {
     rect = _expandToPanels(hl, rect, pad)
   }
-  tourState.highlightRect = rect
+  return rect
+}
+
+/**
+ * 计算并提交高亮矩形到 tourState（同步，绝不经 rAF——否则首帧/换步的基础框会因 rAF 延迟而不出现）。
+ * - animate=false（滚动 / 缩放）：highlightAnimated=false → 组件侧即时吸附贴合。
+ * - animate=true（换步首帧）：highlightAnimated=true → 组件侧按 rectTransition 平滑滑移到新目标。
+ * 扩展（面板开合）的逐帧重测由 MutationObserver 的 rAF 合帧回调驱动（见 _startTrackingRect）。
+ */
+function _updateRect(el: HTMLElement, animate = false): void {
+  if (!tourState.active) return
+  tourState.highlightAnimated = animate
+  tourState.highlightRect = _computeRect(el)
 }
 
 // ---------- promoteControl：把 form 叶子提升到"画了可见盒子"的控件根 ----------
@@ -422,15 +482,17 @@ function _expandToPanels(hl: HTMLElement, base: HighlightRect, pad: number): Hig
   // ① 因果绑定优先
   if (_boundPanel && _boundPanel.isConnected && _panelVisible(_boundPanel)) include(_boundPanel)
 
-  const armed = performance.now() < _panelArmedUntil
+  let armed = performance.now() < _panelArmedUntil
   for (const c of _panelCandidates(hl)) {
     if (c === _boundPanel) continue
     if (_rectAdjacent(_rawBox(c), tr)) {
       include(c)
     } else if (armed) {
-      // 因果窗口内冒出来、却没贴着目标（翻转/有间隙）→ 绑定为它的面板
+      // 因果窗口内冒出来、却没贴着目标（翻转/有间隙）→ 只认第一个为它的面板，
+      // 绑定后立刻收窗，避免把后续无关浮层一并抢绑进来撑大高亮
       _boundPanel = c
       _panelArmedUntil = 0
+      armed = false
       include(c)
     }
   }
@@ -463,25 +525,37 @@ function _panelCandidates(hl: HTMLElement): HTMLElement[] {
   return out
 }
 
-/** 节点是否为"可见的浮层面板"：定位、非引导自身、非目标祖先、非全屏遮罩 */
+/**
+ * 浮层是否"用户看得见"：非 display/visibility 隐藏、与视口有交集、尺寸有效。
+ * 第三方扩展常往 body 注入定位到视口外的固定浮层（如截图工具的隐藏右键菜单，
+ * top 可达数千像素），若被当成面板并入会把高亮撑到整屏——用"完全落在视口外"剔除。
+ * 注意不用 opacity 判断：组件开合过渡的首帧 opacity 为 0，会误伤正在展开的真实面板。
+ */
+function _panelShown(node: HTMLElement): boolean {
+  const cs = getComputedStyle(node)
+  if (cs.display === 'none' || cs.visibility === 'hidden') return false
+  if (_isLeaving(node)) return false // 收起过渡中的面板视为已消失，高亮同步缩回
+  const r = node.getBoundingClientRect()
+  if (r.bottom <= 0 || r.right <= 0 || r.top >= window.innerHeight || r.left >= window.innerWidth) return false
+  return node.offsetWidth >= 2 && node.offsetHeight >= 2
+}
+
+/** 节点是否为"可见的浮层面板"：定位、非引导自身、非目标祖先、非全屏遮罩、看得见 */
 function _isPanelOf(node: HTMLElement, hl: HTMLElement): boolean {
   if (node === hl || node.contains(hl)) return false
   const tourRoot = document.querySelector('.tour-root')
   if (tourRoot && (node === tourRoot || tourRoot.contains(node) || node.contains(tourRoot))) return false
   const cs = getComputedStyle(node)
   if (cs.position !== 'fixed' && cs.position !== 'absolute') return false
-  if (cs.display === 'none' || cs.visibility === 'hidden') return false
+  if (!_panelShown(node)) return false
   // 尺寸判据用布局值：面板自身的开合过渡(scale/fade)不该让它被误判为"太小"
   const w = node.offsetWidth, h = node.offsetHeight
-  if (w < 2 || h < 2) return false
   if (w >= window.innerWidth * 0.9 && h >= window.innerHeight * 0.9) return false
   return true
 }
 
 function _panelVisible(node: HTMLElement): boolean {
-  const cs = getComputedStyle(node)
-  if (cs.display === 'none' || cs.visibility === 'hidden') return false
-  return node.offsetWidth >= 2 && node.offsetHeight >= 2
+  return _panelShown(node)
 }
 
 function _rectAdjacent(a: HighlightRect, b: HighlightRect): boolean {
@@ -497,11 +571,28 @@ function _startTrackingRect(el: HTMLElement): void {
   _scrollHandler = () => _updateRect(el)
   window.addEventListener('scroll', _scrollHandler, true)
   window.addEventListener('resize', _scrollHandler)
-  _resizeObs = new ResizeObserver(() => _updateRect(el))
+  // ResizeObserver 在 observe() 后会立即回调一次"初始尺寸"（非真实变化）。若让它以 snap 提交，
+  // 会打断 _onTargetReady 刚启动的换步 glide → 换步看着像跳变。忽略这一次，之后真实 resize 才跟随。
+  let _roInit = true
+  _resizeObs = new ResizeObserver(() => {
+    if (_roInit) { _roInit = false; return }
+    _updateRect(el)
+  })
   _resizeObs.observe(hl)
   const step = _currentStep
   if (step?.expandSelector || step?.autoExpand) {
-    _expandObs = new MutationObserver(() => _updateRect(el))
+    _expandObs = new MutationObserver((muts) => {
+      // 忽略引导自身浮层（.tour-highlight/.tour-mask-path 等）逐帧 style 变更，避免动画自反馈抖动
+      const tourRoot = document.querySelector('.tour-root')
+      for (const m of muts) {
+        const n = m.target as Node
+        if (tourRoot && (n === tourRoot || tourRoot.contains(n))) continue
+        // 面板开合即时同步提交（animate=true → 组件侧 glide 平滑长大/缩回）；
+        // 收起由 _isLeaving 提前判消失，不需要逐帧跟踪 CSS 过渡
+        _updateRect(el, true)
+        return
+      }
+    })
     _expandObs.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class'] })
   }
   // autoExpand 因果绑定：在 target 控件上按下/聚焦 → 开一个捕获窗口

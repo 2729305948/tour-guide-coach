@@ -8,6 +8,7 @@ const CSS = `
 .tour-root{--tg-primary:var(--el-color-primary,#409eff);--tg-success:var(--el-color-success,#67c23a);--tg-warning:var(--el-color-warning,#e6a23c);--tg-danger:var(--el-color-danger,#f56c6c);--tg-text-1:var(--el-text-color-primary,#303133);--tg-text-2:var(--el-text-color-regular,#606266);--tg-text-3:var(--el-text-color-secondary,#909399);--tg-border:var(--el-border-color-lighter,#ebeef5);--tg-fill-light:var(--el-fill-color-light,#f5f7fa);--tg-radius:var(--el-border-radius-base,4px);position:fixed;inset:0;z-index:100000;pointer-events:none;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',sans-serif}
 .tour-mask-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:hidden}
 .tour-mask-path{fill:rgba(0,0,0,.55);pointer-events:auto;cursor:not-allowed}
+.tour-mask-path--passthru{pointer-events:none;cursor:default}
 .tour-highlight{z-index:100001}
 .tour-autoguard{position:fixed;z-index:100001;background:transparent;border-radius:8px;cursor:not-allowed;pointer-events:auto}
 .tg-btn{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--tg-border);border-radius:var(--tg-radius);background:#fff;color:var(--tg-text-2);font-size:14px;font-weight:500;line-height:1;padding:8px 15px;cursor:pointer;transition:color .2s,border-color .2s,background .2s;outline:none;white-space:nowrap;user-select:none}

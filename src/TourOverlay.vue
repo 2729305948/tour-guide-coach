@@ -9,15 +9,18 @@
     <div v-if="store.active" class="tour-root">
       <!-- SVG 遮罩：整屏压暗，有目标时用 evenodd 挖出与高亮同尺寸同圆角的透明区 -->
       <svg v-if="showMask" class="tour-mask-svg" aria-hidden="true">
-        <path class="tour-mask-path" :d="maskPath" fill-rule="evenodd" @click="onBlockedClick" />
+        <path class="tour-mask-path" :class="{ 'tour-mask-path--passthru': step?.hostDismissable }"
+              :d="maskPath" fill-rule="evenodd" @click="onBlockedClick" />
       </svg>
       <!-- 高亮边框 -->
       <div v-if="rect" class="tour-highlight" :style="highlightStyle" />
       <!-- auto 托管：盖在聚光灯洞上的透明点击护栏，吞掉用户真实点击（引擎合成点击不受影响） -->
       <div v-if="isAuto && rect" class="tour-autoguard" :style="autoGuardStyle"
            @pointerdown.stop.prevent @mousedown.stop.prevent @click.stop.prevent @touchstart.stop.prevent />
-      <!-- 提示气泡 -->
-      <div v-if="step && !store.waitingTarget && !store.targetLost" ref="popoverRef" class="tour-popover" :style="popoverStyle">
+      <!-- 提示气泡：@mousedown.prevent 阻止按下气泡按钮时把焦点从宿主控件抢走。
+           否则高亮的 el-select 会因失焦(useFocusController.afterBlur)在 mousedown 阶段就收起下拉，
+           导致高亮矩形缩小、气泡重新定位跑开，mouseup 落空 → 点不到「完成/下一步」（坑 #多popper）。 -->
+      <div v-if="step && !store.waitingTarget && !store.targetLost && !store.completing" ref="popoverRef" class="tour-popover" :style="popoverStyle" @mousedown.prevent>
         <div class="tp-head">
           <span class="tp-step-no" :style="{ background: accentColor }">{{ store.stepIndex + 1 }}</span>
           <span v-if="step.gate" class="tp-required">*</span>
@@ -81,14 +84,17 @@ import { computed, ref, watch, onBeforeUnmount } from 'vue'
 import { tourState, abort, next, skip, retryLost, currentStep } from './store'
 import { injectStyles } from './css'
 import type { CSSProperties } from 'vue'
+import type { HighlightRect } from './types'
 
 injectStyles()
 
 const store = tourState
 
-/** ESC 退出引导 */
+/** ESC 退出引导（hostDismissable 步骤除外——ESC 交还宿主去关窗，由存活检测判定意外关窗） */
 function onKeydown(e: KeyboardEvent): void {
-  if (e.key === 'Escape' && store.active) abort()
+  if (e.key !== 'Escape' || !store.active) return
+  if (currentStep()?.hostDismissable) return
+  abort()
 }
 watch(() => store.active, (isActive) => {
   if (isActive) window.addEventListener('keydown', onKeydown)
@@ -97,7 +103,89 @@ watch(() => store.active, (isActive) => {
 onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
 const step = computed(() => currentStep())
-const rect = computed(() => store.highlightRect)
+
+// ---------- 动画可视区（遮罩洞 / 边框 / 气泡 / 护栏的单一来源） ----------
+/** store 发布的目标矩形（扩展已 rAF 逐帧跟随），作为动画的追随目标 */
+const rawRect = computed<HighlightRect | null>(() => store.highlightRect)
+/** 逐帧插值后的可视区矩形；所有渲染读它，保证洞与边框永远贴合、跨浏览器一致 */
+const rect = ref<HighlightRect | null>(null)
+
+const cloneRect = (r: HighlightRect): HighlightRect => ({ top: r.top, left: r.left, width: r.width, height: r.height })
+/**
+ * 平滑过渡时长（ms），0=不动画。
+ * 注意：这里刻意不读 prefers-reduced-motion——聚光灯的形变/滑移是本功能的核心反馈，
+ * 系统级"减弱动态效果"会把它整体掐掉导致"看不到任何过渡"。要关，用显式开关 `rectTransition: 0`。
+ * highlightAnimMs 为一次性时长覆盖（完成动画取 completeTransition），否则用 rectTransition。
+ */
+const transitionMs = (): number => store.highlightAnimMs ?? store.config?.rectTransition ?? 200
+
+let _followRaf: number | null = null
+let _graceTimer: ReturnType<typeof setTimeout> | null = null
+let _lastTs = 0
+
+function _stopFollow(): void {
+  if (_followRaf != null) { cancelAnimationFrame(_followRaf); _followRaf = null }
+}
+function _stopGrace(): void {
+  if (_graceTimer) { clearTimeout(_graceTimer); _graceTimer = null }
+}
+
+/**
+ * 连续 follow：逐帧把 rect 向「当前」rawRect 指数逼近。目标每帧被 store 刷新时它会自动改追，
+ * 不重启、不跳格，天然跟随面板自身开合动画增长。与目标差 <0.5px 即吸附收敛并停环，避免空转。
+ */
+function _startFollow(): void {
+  if (_followRaf != null) return
+  _lastTs = performance.now()
+  const tick = (now: number): void => {
+    _followRaf = null
+    if (!store.active) return
+    const tgt = rawRect.value
+    const cur = rect.value
+    if (!tgt || !cur) return // 目标收起 / 复位：交给 watch 处理
+    const ms = transitionMs()
+    if (ms <= 0) { rect.value = cloneRect(tgt); return }
+    const dt = Math.min(64, now - _lastTs) // 卡帧/后台回来限幅，避免一步跨越
+    _lastTs = now
+    const k = 1 - Math.exp(-dt / (ms / 3)) // 时间常数 τ=ms/3 → 约 3τ≈ms 收敛 ~95%
+    const top = cur.top + (tgt.top - cur.top) * k
+    const left = cur.left + (tgt.left - cur.left) * k
+    const width = cur.width + (tgt.width - cur.width) * k
+    const height = cur.height + (tgt.height - cur.height) * k
+    if (Math.abs(top - tgt.top) < 0.5 && Math.abs(left - tgt.left) < 0.5 &&
+        Math.abs(width - tgt.width) < 0.5 && Math.abs(height - tgt.height) < 0.5) {
+      rect.value = cloneRect(tgt)
+      return
+    }
+    rect.value = { top, left, width, height }
+    _followRaf = requestAnimationFrame(tick)
+  }
+  _followRaf = requestAnimationFrame(tick)
+}
+
+watch(rawRect, (to) => {
+  const ms = transitionMs()
+  if (to) {
+    _stopGrace()
+    // 无框(首帧/复位后)、滚动缩放(highlightAnimated=false)、或已关动画 → 吸附贴合；否则平滑追随
+    const snap = !rect.value || !store.highlightAnimated || ms <= 0
+    if (snap) { _stopFollow(); rect.value = cloneRect(to) }
+    else _startFollow()
+    return
+  }
+  // to 为 null：意外关窗立即收起；瞬时换步的 null 间隙先保持旧框，等新目标到达即滑移过去
+  _stopFollow()
+  if (!rect.value) return
+  const hold = ms <= 0 ? 0 : Math.max(ms, 150)
+  _stopGrace()
+  if (store.targetLost || hold === 0) { rect.value = null; return }
+  _graceTimer = setTimeout(() => {
+    _graceTimer = null
+    if (!rawRect.value) rect.value = null
+  }, hold)
+})
+
+onBeforeUnmount(() => { _stopFollow(); _stopGrace() })
 const accentColor = computed(() => step.value?.accent ?? store.config?.accent ?? '#409eff')
 const isLast = computed(() => store.stepIndex >= store.totalSteps - 1)
 /** auto 托管模式：用户只能点「下一步」，页面禁点、引擎代操作 */

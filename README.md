@@ -55,6 +55,7 @@ export const tourCreateProject: TourConfig = {
   name: '新建项目引导',
   accent: '#409eff',
   autoScroll: true,                   // 目标不在视口内时自动滚过去（默认 true）
+  rectTransition: 200,                // 可视区尺寸/位置变化的过渡动画时长（ms，默认 200；0 关闭）
   steps: [
     {
       id: 'open-btn',
@@ -331,6 +332,8 @@ retryLost()    // 中断后重试：重新等待本步目标出现
 | 位置 | 字段 | 默认 | 作用 |
 |---|---|---|---|
 | `TourConfig` | `autoScroll` | `true` | 目标在视口外或被滚动容器裁切时，就绪那一刻自动滚到视野中央 |
+| `TourConfig` | `rectTransition` | `200` | 可视区（遮罩洞/高亮边框）尺寸或位置变化的过渡动画时长（ms），覆盖步骤切换滑移、面板并入/缩回（面板开合一步到位、由本动画平滑过渡；收起经 `*-leave-*` 过渡类提前判消失、不等待 `display:none`）；滚动/缩放始终即时吸附不滞后；置 `0` 关闭 |
+| `TourConfig` | `completeTransition` | `300` | 引导完成时，先把可视区扩到铺满整屏（洞撑满、暗罩淡出）再触发 `onComplete` 的动画时长（ms）；置 `0` 关闭，完成即触发回调 |
 | `TourConfig` | `onTargetLost` | 无 | 依附窗口被意外关闭时回调宿主（stepId / stepIndex / target / reason） |
 | `TourStep` | `maskWhileWaiting` | `true` | 等待目标期间是否压全屏遮罩；需要用户点页面元素唤醒目标时置 `false` |
 

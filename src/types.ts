@@ -79,6 +79,13 @@ export interface TourStep {
    *  置 false 用于「需要用户点击页面元素才能唤醒目标」的步骤，否则点不到那个按钮。
    *  注意：目标意外消失（targetLost）时始终不压遮罩，用户要能重开窗口。 */
   maskWhileWaiting?: boolean
+  /** 本步允许用户用宿主自身的方式关掉依附的窗口（点 ×、点遮罩、按 ESC，或点弹窗底部按钮）。
+   *  置 true 时引擎做两件事：① 遮罩只作视觉压暗、不再拦截点击（pointer-events 放行，洞外元素可点）；
+   *  ② ESC 不再被引导劫持去 abort，交还宿主处理（如 el-dialog 的 close-on-press-escape）。
+   *  窗口随之消失 → 照常触发「意外关窗」判定（targetLost）或 gate 已过时的自动推进。
+   *  治的是「请用户主动关窗」类步骤：否则聚光灯洞外的 × / 遮罩 / footer 按钮点不到、ESC 会直接退出引导。
+   *  默认关——保持「只有高亮区可点」的引导约束。 */
+  hostDismissable?: boolean
   /** trigger=auto 时，自动前进延时（ms），默认 600 */
   autoDelay?: number
   /** trigger=click 时，前进延时（ms），等 click 引起的 DOM 变化完成，默认 350 */
@@ -136,6 +143,14 @@ export interface TourConfig {
   /** 目标不在视口内时自动滚动到高亮位置（默认 true）。
    *  只在目标刚就绪的那一刻滚一次，之后用户手动滚动不会被抢方向盘。 */
   autoScroll?: boolean
+  /** 可视区（遮罩洞 / 高亮边框）尺寸或位置变化时的过渡动画时长（ms），默认 200。
+   *  作为逐帧插值的平滑时间常数：扩展并入面板的形变、步骤切换时高亮迁移都按此时长平滑过渡。
+   *  滚动 / 缩放不在此列，始终即时吸附贴合、不做滞后。置 0 关闭动画（瞬时跳变）。
+   *  实现为引擎侧逐帧插值，遮罩洞与边框读同一动画值，跨浏览器一致（不依赖 CSS `d` 过渡）。 */
+  rectTransition?: number
+  /** 引导完成时，先把可视区扩大到铺满整屏（洞撑满 → 暗罩淡出）再触发 onComplete 的动画时长（ms），默认 300。
+   *  置 0 关闭该收尾动画，完成时立即触发 onComplete。 */
+  completeTransition?: number
   /** 引导步骤列表（按序播放） */
   steps: TourStep[]
   /** 依附的目标窗口被意外关闭时的回调（引擎同时弹出中断提示，见 TourOverlay）。

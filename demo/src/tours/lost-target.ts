@@ -41,6 +41,7 @@ export const lostThenRetryTour: TourConfig = {
       trigger: 'manual',
       gate: hasCategory,
       gateHint: '本步故意不让你通过：请先关窗',
+      hostDismissable: true,
       warn: '关窗后遮罩洞会收起，页面重新可操作，这是为了让你能重开弹窗。'
     },
     {
@@ -94,6 +95,7 @@ export const gatePassedTour: TourConfig = {
       trigger: 'manual',
       gate: hasCategory,
       gateHint: '先选一个分类',
+      hostDismissable: true,
       tip: '日志里应出现「✓ 门控通过」，且不会出现「判定意外关闭」。'
     },
     {
