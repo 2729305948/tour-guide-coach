@@ -29,7 +29,7 @@ export const lostThenRetryTour: TourConfig = {
       content: '这一步正常挂载高亮。',
       trigger: 'click',
       afterClickWait: S.categorySelect,
-      clickDelay: 400
+      clickDelay: 0
     },
     {
       id: 'must-close',
@@ -62,7 +62,7 @@ export const lostThenRetryTour: TourConfig = {
       title: '提交',
       content: '点「确定」收尾。',
       trigger: 'click',
-      clickDelay: 400
+      clickDelay: 0
     }
   ]
 }
@@ -82,7 +82,7 @@ export const gatePassedTour: TourConfig = {
       content: '点按钮开弹窗。',
       trigger: 'click',
       afterClickWait: S.categorySelect,
-      clickDelay: 400
+      clickDelay: 0
     },
     {
       id: 'pick-then-save',
@@ -124,7 +124,7 @@ export const swapDialogTour: TourConfig = {
       content: '点按钮开弹窗 A。',
       trigger: 'click',
       afterClickWait: S.openClassBtn,
-      clickDelay: 400
+      clickDelay: 0
     },
     {
       id: 'to-b',
@@ -135,7 +135,7 @@ export const swapDialogTour: TourConfig = {
         + '这类"自己关自己"的消失是正常流转，不该弹中断。',
       trigger: 'click',
       afterClickWait: S.classGroup,
-      clickDelay: 400
+      clickDelay: 0
     },
     {
       id: 'pick-class',
@@ -154,7 +154,7 @@ export const swapDialogTour: TourConfig = {
       title: '确认',
       content: '点「确认选择」收尾（B 关闭，A 仍在）。',
       trigger: 'click',
-      clickDelay: 400
+      clickDelay: 0
     }
   ]
 }

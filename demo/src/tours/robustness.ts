@@ -32,7 +32,7 @@ export const scrollRebuildTour: TourConfig = {
       content: '这个弹窗是 destroy-on-close 的：每次打开都是全新 DOM 节点。\n关闭再打开也不影响引导挂到新节点上。',
       trigger: 'click',
       afterClickWait: S.categorySelect,
-      clickDelay: 400
+      clickDelay: 0
     },
     {
       id: 'fill',
@@ -62,7 +62,7 @@ export const scrollRebuildTour: TourConfig = {
       title: '提交',
       content: '点「确定」收尾。',
       trigger: 'click',
-      clickDelay: 400
+      clickDelay: 0
     }
   ]
 }
@@ -132,7 +132,7 @@ export const fullFlowTour: TourConfig = {
       content: '点「新建项目」。',
       trigger: 'click',
       afterClickWait: S.nameInput,
-      clickDelay: 400
+      clickDelay: 0
     },
     {
       id: 'name',
@@ -171,7 +171,7 @@ export const fullFlowTour: TourConfig = {
       content: '点它会关掉弹窗 A、打开弹窗 B。',
       trigger: 'click',
       afterClickWait: S.classGroup,
-      clickDelay: 400
+      clickDelay: 0
     },
     {
       id: 'class',
@@ -190,7 +190,7 @@ export const fullFlowTour: TourConfig = {
       title: '确认并发布',
       content: '点「确认选择」，引导完成。',
       trigger: 'click',
-      clickDelay: 400
+      clickDelay: 0
     }
   ]
 }

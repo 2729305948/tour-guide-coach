@@ -71,6 +71,9 @@ let _hlEl: HTMLElement | null = null
 let _boundPanel: HTMLElement | null = null
 let _panelArmedUntil = 0
 let _armPanelHandler: ((e: Event) => void) | null = null
+/** 入场过渡跟随的 rAF 句柄（见 _followEnterTransition），随 _stopTrackingRect 一并回收 */
+let _enterRaf: number | null = null
+let _enterDeadline = 0
 
 function _currentStepFn(): TourStep | null {
   return tourState.config?.steps[tourState.stepIndex] ?? null
@@ -288,6 +291,7 @@ function _onTargetReady(el: HTMLElement | null, step: TourStep): void {
   _startTrackingRect(el)          // 先绑滚动/尺寸监听
   _scrollIntoViewIfNeeded(el)     // 再滚动，滚动事件会持续把 rect 刷新到位
   _updateRect(el, true)           // 进入本步首帧：animate=true，让上一步保持的旧框平滑滑移到新目标
+  _followEnterTransition(el)      // 目标若正随入场动画滑入（translate 偏移 RO 看不见），逐帧跟到落位
   // auto 模式：用户不操作、页面变化只由引擎 action 引发（属预期），不绑 trigger/gate，也不做意外关窗检测
   if (tourState.config?.mode !== 'auto') {
     _bindTrigger(el, step)
@@ -365,13 +369,20 @@ function _rawBox(el: HTMLElement): HighlightRect {
 }
 
 /**
- * 元素（或其浮层包裹层）是否处于 Vue 过渡的 leave 阶段。Vue/EP 的过渡类名约定为 `*-leave-*`
- * （如 el-zoom-in-top-leave-active），且 EP 的过渡类加在 .el-popper 包裹层而非下拉面板本身，
- * 所以沿祖先向上查。面板收起动画期间它仍在 DOM、offsetHeight 不变，若照常并入，高亮会一直
- * 撑到 display:none 才缩——表现为"收起停顿一下才缩"。视为已消失即可让高亮同步缩回。
+ * 元素（或其浮层包裹层）是否处于 Vue 过渡的指定阶段。Vue/EP 的过渡类名约定为 `*-leave-*` /
+ * `*-enter-*`（如 el-zoom-in-top-leave-active），且 EP 的过渡类加在 .el-popper 包裹层而非
+ * 面板本身，所以沿祖先向上查。
+ */
+function _inTransition(el: HTMLElement, phase: 'enter' | 'leave'): boolean {
+  return !!el.closest(`[class*="-${phase}-"]`)
+}
+
+/**
+ * 面板收起时它仍在 DOM、offsetHeight 不变，若照常并入，高亮会一直撑到 display:none 才缩——
+ * 表现为"收起停顿一下才缩"。视为已消失即可让高亮同步缩回。
  */
 function _isLeaving(el: HTMLElement): boolean {
-  return !!el.closest('[class*="-leave-"]')
+  return _inTransition(el, 'leave')
 }
 
 function _computeRect(el: HTMLElement): HighlightRect {
@@ -573,6 +584,33 @@ function _rectAdjacent(a: HighlightRect, b: HighlightRect): boolean {
            aB < b.top - PANEL_GAP || a.top > bB + PANEL_GAP)
 }
 
+/** 入场过渡跟随的最长时间（ms）：兜住宿主把 `*-enter-*` 类写死没清、环停不下来的情况 */
+const ENTER_FOLLOW_MAX_MS = 1200
+
+function _stopEnterFollow(): void {
+  if (_enterRaf != null) { cancelAnimationFrame(_enterRaf); _enterRaf = null }
+}
+
+/**
+ * 目标正随组件入场动画滑入时（EP 弹窗 dialog-fade-in 是 translateY(-20px)→0 / 300ms），
+ * 首帧量到的视觉中心是偏的；而 ResizeObserver 只看内容盒尺寸、不看 transform，滚动也不触发，
+ * 这个偏移不会自纠——高亮会一直停在偏上约 20px 处。这里在 enter 过渡类还在的期间逐帧重测
+ * （animate=true → 组件侧 glide 持续追新目标），并在过渡消失后再补量一帧即停环，不长期空转。
+ * 有了它，afterClickWait 步骤就不必再靠 clickDelay 盲等动画走完。
+ */
+function _followEnterTransition(el: HTMLElement): void {
+  _stopEnterFollow()
+  if (!_inTransition(el, 'enter')) return
+  _enterDeadline = performance.now() + ENTER_FOLLOW_MAX_MS
+  const tick = (): void => {
+    _enterRaf = null
+    if (!tourState.active || performance.now() > _enterDeadline) return
+    _updateRect(el, true)
+    if (_inTransition(el, 'enter')) _enterRaf = requestAnimationFrame(tick)
+  }
+  _enterRaf = requestAnimationFrame(tick)
+}
+
 function _startTrackingRect(el: HTMLElement): void {
   _stopTrackingRect()
   const hl = _hlEl ?? el
@@ -617,6 +655,7 @@ function _startTrackingRect(el: HTMLElement): void {
 }
 
 function _stopTrackingRect(): void {
+  _stopEnterFollow()
   if (_scrollHandler) {
     window.removeEventListener('scroll', _scrollHandler, true)
     window.removeEventListener('resize', _scrollHandler)

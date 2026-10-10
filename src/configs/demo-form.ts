@@ -19,7 +19,8 @@ export const demoFormTour: TourConfig = {
       content: '点击这个按钮打开表单弹窗。',
       trigger: 'click',
       afterClickWait: '.el-dialog__body .el-form-item:nth-child(1)',
-      clickDelay: 500
+      // 弹窗入场偏移由引擎的 enter 逐帧跟随兜住，这里不再盲等动画走完
+      clickDelay: 0
     },
     {
       id: 'name-field',
