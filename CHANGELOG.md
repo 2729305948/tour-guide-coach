@@ -4,6 +4,33 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.2.0] - 2026-10-10
+
+### 新增
+
+- **可视区过渡动画 `rectTransition`**：遮罩洞 / 高亮边框由引擎侧逐帧插值平滑过渡——步骤切换滑移、面板并入 / 缩回都按此动画走；滚动 / 缩放始终即时吸附不滞后。默认 200ms，置 `0` 关闭。
+- **完成收尾动画 `completeTransition`**：引导完成时先把可视区扩到铺满整屏（洞撑满 → 暗罩淡出）再触发 `onComplete`。默认 300ms，置 `0` 立即触发。
+- **宿主可关窗 `hostDismissable`**（步骤级）：遮罩只作视觉压暗、不再拦截点击，ESC 交还宿主处理（如 el-dialog 的 close-on-press-escape）——用于「请用户主动关窗」类步骤；窗口消失照常触发意外关窗判定或 gate 已过时的自动推进。
+- **入场过渡逐帧跟随**：目标随组件 `*-enter-*` 过渡滑入（如 EP 弹窗的 translateY(-20px)→0）时，高亮逐帧重测跟随到落位（上限 1200ms），入场偏移不再需要 `clickDelay` 盲等兜住。
+- **`TourConfig.actionDwell`**：auto 模式下 action 执行完到推步之间的全局停留（ms），默认 350；单步 `actionDwell` 优先。只影响「看清」节奏，等 DOM 渲染交给引擎。
+- **`TourConfig.selectShowMs`**：auto 模式下 `ctx.select` 展开下拉后选项的最短可见时长（ms），默认 350、从面板「出现」起算；置 `0` 发现即点。
+
+### 变更
+
+- auto 托管等待改事件驱动：新增 MutationObserver 驱动的节点等待（命中即走、不受后台标签页定时器节流），`ctx.select` 不再盲等固定时长；`actionDwell` 默认 600 → 350。
+
+### 修复
+
+- 目标消失（`removed` / `hidden`）时冻结高亮矩形、放弃本次提交：`display:none` 量出的 0 尺寸矩形不再让高亮「飞左上角」、结束动画从小点中心炸开；恢复可见后自动续跟。
+- 面板测量改用布局 `offsetWidth` / `offsetHeight`（不受开合过渡 scale 影响，首帧即最终大小）；收起经 `*-leave-*` 过渡类提前判消失，治「收起停顿」。
+- 浮层判定剔除完全落在视口外的第三方浮层（扩展注入的隐藏菜单等不再把高亮撑到整屏）。
+- 换步首帧 glide 不再被 ResizeObserver 初始回调打断；MutationObserver 忽略引导自身浮层的逐帧变更，避免动画自反馈抖动。
+- 气泡按下不再抢走宿主控件焦点，治高亮 `el-select` 时点不到「完成 / 下一步」。
+
+### 演示
+
+- demo 各引导去掉 `clickDelay` 盲等：入场偏移由逐帧跟随兜住、目标等待由 `afterClickWait` 覆盖；lost-target / gate-passed 示例启用 `hostDismissable`。
+
 ## [1.1.0] - 2026-09-24
 
 ### 新增
