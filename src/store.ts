@@ -409,9 +409,17 @@ function _computeRect(el: HTMLElement): HighlightRect {
  * - animate=false（滚动 / 缩放）：highlightAnimated=false → 组件侧即时吸附贴合。
  * - animate=true（换步首帧）：highlightAnimated=true → 组件侧按 rectTransition 平滑滑移到新目标。
  * 扩展（面板开合）的逐帧重测由 MutationObserver 的 rAF 合帧回调驱动（见 _startTrackingRect）。
+ *
+ * 目标消失（removed/hidden）时直接放弃本次提交、冻结上一次可见矩形：
+ * display:none 的元素 getBoundingClientRect 与 offsetWidth/Height 全为 0，量出来是贴在
+ * 视口原点、只剩 pad 大小的小点（trigger=click 步骤点完按钮、宿主弹窗先关而 clickDelay 还要
+ * 等几百毫秒才推步时必然命中）。危害有二：小点被 snap 提交 → 高亮"飞到左上角"；
+ * complete() 又拿小点中心当放大原点 → 结束动画从屏幕角炸开。元素恢复可见后 RO/scroll 会
+ * 再次触发本函数，矩形自动续跟，无需额外补偿。
  */
 function _updateRect(el: HTMLElement, animate = false): void {
   if (!tourState.active) return
+  if (_probeTarget(el)) return
   tourState.highlightAnimated = animate
   tourState.highlightRect = _computeRect(el)
 }

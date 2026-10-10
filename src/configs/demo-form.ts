@@ -74,7 +74,8 @@ export const demoFormTour: TourConfig = {
       title: '提交表单',
       content: '点击「确定」提交，引导结束。',
       trigger: 'click',
-      clickDelay: 500
+      // 最后一步无需等新目标出现（complete() 只从当前矩形原地放大），延时纯属空等 → 0
+      clickDelay: 0
     }
   ]
 }
