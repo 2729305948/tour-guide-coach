@@ -891,10 +891,10 @@ async function _actSelect(el: HTMLElement, label: string | number): Promise<void
   // 触发点在内部（EP 的下拉监听在 wrapper，对根节点派发不会向下冒泡）；点 input 会冒泡到 wrapper 打开
   const trigger = (el.querySelector('[aria-haspopup],[role="combobox"],input') || el) as HTMLElement
   _actClick(trigger)
-  const t0 = performance.now()
   const visible = await _waitForNodes(_visibleOptions, SELECT_PANEL_TIMEOUT_MS)
-  const showLeft = (tourState.config?.selectShowMs ?? SELECT_SHOW_MIN_MS) - (performance.now() - t0)
-  if (showLeft > 0) await new Promise((r) => window.setTimeout(r, showLeft))
+  // 计时从面板「出现」起算：露足 showMs；未出现则不空等
+  const showMs = tourState.config?.selectShowMs ?? SELECT_SHOW_MIN_MS
+  if (visible.length && showMs > 0) await new Promise((r) => window.setTimeout(r, showMs))
   const hit = typeof label === 'number'
     ? visible[label]
     : visible.find((o) => (o.textContent || '').trim().includes(String(label)))
