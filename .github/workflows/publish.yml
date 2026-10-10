@@ -1,0 +1,53 @@
+# 可信发布（OIDC）：发布不再依赖任何 npm token。
+# GitHub Actions 用 id-token 向 npm 换取短时发布凭证。
+# 前置条件：npmjs.com 上该包已登记可信发布者（仓库 2729305948/tour-guide-coach + 本文件名 publish.yml）。
+name: 发布到 npm
+
+on:
+  push:
+    tags: ['v*']              # git push origin v1.2.1 → 自动发版
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 仅演练（构建 + 打包校验，不实际发布）
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  id-token: write             # OIDC 必需；不要配 NODE_AUTH_TOKEN
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: 升级 npm（可信发布需较新的 CLI）
+        run: npm install -g npm@latest
+      - name: 安装依赖
+        run: npm ci
+      - name: 安装 demo 依赖
+        run: npm ci
+        working-directory: demo
+      - name: 类型检查
+        run: npm run typecheck
+      - name: 校验 tag 与 package.json 版本一致
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          want="v$(node -p 'JSON.parse(require("fs").readFileSync("package.json","utf8")).version')"
+          if [ "$want" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME 与 package.json 的版本 $want 不一致：请先更新版本号与 CHANGELOG 并提交，再打 tag"
+            exit 1
+          fi
+      - name: 演练（dry-run，不发布）
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: npm publish --dry-run
+      - name: 正式发布（OIDC + provenance）
+        if: ${{ github.event_name == 'push' || !inputs.dry_run }}
+        run: npm publish --provenance

@@ -2,6 +2,10 @@
   "name": "tour-guide-coach",
   "version": "1.2.0",
   "description": "轻量级交互式漫游引导引擎（Vue 3，零外部依赖，Element Plus 风格）",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/2729305948/tour-guide-coach.git"
+  },
   "type": "module",
   "sideEffects": true,
   "main": "./dist/index.cjs",
